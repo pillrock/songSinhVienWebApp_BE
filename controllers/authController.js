@@ -11,7 +11,7 @@ exports.login = async (req, res) => {
     if (!user || !(await bcrypt.compare(password, user.password))) {
       return res.status(401).json({ message: 'Tài khoản hoặc mật khẩu không đúng' });
     }
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
     res.json({ token, user: { id: user._id, username: user.username, role: user.role, roomId: user.roomId } });
   } catch (err) {
     res.status(500).json({ message: 'Lỗi server khi đăng nhập' });

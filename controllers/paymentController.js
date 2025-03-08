@@ -1,4 +1,4 @@
-const PaymentRepository = require('../repositories/paymentRepository.js');
+const PaymentRepository = require('../repositories/PaymentRepository.js');
 const Payment = require("../models/Payment.js");
 const UserRepository = require('../repositories/UserRepository.js');
 const Room = require('../models/Room.js');

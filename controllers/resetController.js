@@ -1,5 +1,5 @@
 // controllers/resetController.js
-const PaymentRepository = require('../repositoriesPpaymentRepository');
+const PaymentRepository = require('../repositories/PaymentRepository');
 const SettlementRepository = require('../repositories/SettlementRepository');
 
 exports.resetDataByRoom = async (req, res) => {

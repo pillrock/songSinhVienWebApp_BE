@@ -14,7 +14,7 @@ const app = express();
 const corsOptions = {
   origin: [
     'http://localhost:3000', // Frontend trên máy tính
-    'https://bc4d-2405-4802-1d04-6100-d975-13fd-d8eb-5c4e.ngrok-free.app' // Thay your-ngrok-url bằng URL thực tế từ Ngrok
+    'https://ssv-mocha.vercel.app' // Thay your-ngrok-url bằng URL thực tế từ Ngrok
   ],
   credentials: true // Cho phép gửi cookie/token nếu cần
 };

@@ -13,8 +13,7 @@ const app = express();
 
 const corsOptions = {
   origin: [
-    'http://localhost:3000', // Frontend trên máy tính
-    'https://ssv-mocha.vercel.app' // Thay your-ngrok-url bằng URL thực tế từ Ngrok
+    process.env.URL_FRONTEND,
   ],
   credentials: true // Cho phép gửi cookie/token nếu cần
 };

@@ -6,14 +6,14 @@ const authRoutes = require('./routes/authRoutes');
 const paymentRoutes = require('./routes/paymentRoutes');
 const resetRoutes = require('./routes/resetRoutes');
 const cron = require('node-cron'); // Thêm node-cron
-const resetController = require('./controllers/resetController'); // Import resetController
+const resetController = require('./controllers/resetController'); 
 
 dotenv.config();
 const app = express();
-
+console.log(process.env.URL_FRONTEND);
 const corsOptions = {
   origin: [
-    process.env.URL_FRONTEND,
+    "https://ssv06.vercel.app",
   ],
   credentials: true // Cho phép gửi cookie/token nếu cần
 };

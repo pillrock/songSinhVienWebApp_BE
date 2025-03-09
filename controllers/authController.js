@@ -6,6 +6,7 @@ const { updateOne } = require('../models/Settlement.js');
 const { request } = require('express');
 exports.login = async (req, res) => {
   const { username, password } = req.body;
+  
   try {
     const user = await UserRepository.findByUsername(username);
     if (!user || !(await bcrypt.compare(password, user.password))) {

@@ -8,40 +8,73 @@ exports.resetDataByRoom = async (req, res) => {
     const users = await PaymentRepository.findAllUsers(req.user.roomId);
     const allUsernames = users.map(u => u.username);
 
-    // Tạo settlement cho từng payment riêng lẻ
-    const currentMonth = new Date().toISOString().slice(0, 7);
-    for (const payment of payments) {
-      // Nếu không có participants, mặc định là tất cả users trừ payer
-      const participants = payment.participants.length > 0 
-        ? payment.participants 
-        : allUsernames.filter(u => u !== payment.payer);
-      
-      const totalParticipants = participants.length;
-      const amountPerPerson = payment.amount / (totalParticipants + 1); // +1 vì tính cả payer
+    // Nhóm payments theo payer và month
+    const groupedByPayer = payments.reduce((acc, payment) => {
+      const key = `${payment.payer}-${new Date().toISOString().slice(0, 7)}`;
+      if (!acc[key]) {
+        acc[key] = {
+          payer: payment.payer,
+          month: new Date().toISOString().slice(0, 7),
+          payments: [],
+        };
+      }
+      acc[key].payments.push(payment);
+      return acc;
+    }, {});
 
-      // Tạo danh sách participants với trạng thái paid
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    for (const key in groupedByPayer) {
+      const { payer, payments } = groupedByPayer[key];
+
+      // Tính tổng số tiền của tất cả payments
+      const totalAmount = payments.reduce((sum, payment) => sum + payment.amount, 0);
+
+      // Tính amountOwed cho mỗi user dựa trên từng payment
+      const participantDebts = allUsernames.reduce((acc, username) => {
+        acc[username] = { amountOwed: 0, paid: username === payer };
+        return acc;
+      }, {});
+
+      // Duyệt qua từng payment để tính amountOwed
+      for (const payment of payments) {
+        const participants = payment.participants.length > 0 
+          ? payment.participants 
+          : allUsernames.filter(u => u !== payment.payer); // Thanh toán chung
+        const totalParticipants = participants.length;
+        const amountPerPerson = payment.amount / (totalParticipants + 1); // +1 vì tính cả payer
+
+        // Cộng dồn amountOwed cho các participants
+        participants.forEach(username => {
+          if (username !== payer) {
+            participantDebts[username].amountOwed += amountPerPerson;
+          }
+        });
+      }
+
+      // Tạo participantDetails cho settlement
       const participantDetails = allUsernames.map(username => ({
         username,
-        // Người trả tiền hoặc không nằm trong participants thì đã "paid"
-        paid: username === payment.payer || !participants.includes(username),
+        paid: participantDebts[username].paid,
         proof: null,
-        amountOwed: participants.includes(username) && username !== payment.payer 
-          ? amountPerPerson 
-          : 0
+        amountOwed: participantDebts[username].amountOwed,
       }));
+
+      // Tính amountPerPerson trung bình (chỉ để hiển thị, không dùng để tính nợ)
+      const totalParticipants = participantDetails.filter(p => p.amountOwed > 0).length;
+      const amountPerPerson = totalParticipants > 0 ? totalAmount / (totalParticipants + 1) : 0;
 
       await SettlementRepository.create(
         currentMonth,
-        payment.payer,
-        payment.amount,
-        amountPerPerson,
+        payer,
+        totalAmount,
+        amountPerPerson, // Đây là giá trị trung bình, không ảnh hưởng đến amountOwed
         participantDetails,
         req.user.roomId
       );
     }
 
     // Xóa tất cả payments sau khi tạo settlements
-    await PaymentRepository.deleteAllPayments(req.user.roomId);
+    // await PaymentRepository.deleteAllPayments(req.user.roomId);
     res.json({ message: 'Data reset and settlements created for room' });
   } catch (err) {
     res.status(500).json({ message: 'Error resetting data', error: err.message });
@@ -65,23 +98,64 @@ exports.resetData = async (req, res) => {
   try {
     const payments = await PaymentRepository.findAllPayments(roomId);
     const users = await PaymentRepository.findAllUsers(roomId);
-    const totalUsers = users.length;
+    const allUsernames = users.map(u => u.username);
 
+    // Nhóm payments theo payer
     const groupedByPayer = payments.reduce((acc, payment) => {
-      acc[payment.payer] = (acc[payment.payer] || 0) + payment.amount;
+      const key = `${payment.payer}-${new Date().toISOString().slice(0, 7)}`;
+      if (!acc[key]) {
+        acc[key] = {
+          payer: payment.payer,
+          month: new Date().toISOString().slice(0, 7),
+          payments: [],
+        };
+      }
+      acc[key].payments.push(payment);
       return acc;
     }, {});
 
     const currentMonth = new Date().toISOString().slice(0, 7);
-    for (const [payer, totalAmount] of Object.entries(groupedByPayer)) {
-      const amountPerPerson = totalAmount / totalUsers;
-      const participants = users.map(user => ({
-        username: user.username,
-        paid: user.username === payer,
-        proof: null
+    for (const key in groupedByPayer) {
+      const { payer, payments } = groupedByPayer[key];
+      const totalAmount = payments.reduce((sum, payment) => sum + payment.amount, 0);
+
+      const participantDebts = allUsernames.reduce((acc, username) => {
+        acc[username] = { amountOwed: 0, paid: username === payer };
+        return acc;
+      }, {});
+
+      for (const payment of payments) {
+        const participants = payment.participants.length > 0 
+          ? payment.participants 
+          : allUsernames.filter(u => u !== payment.payer);
+        const totalParticipants = participants.length;
+        const amountPerPerson = payment.amount / (totalParticipants + 1);
+
+        participants.forEach(username => {
+          if (username !== payer) {
+            participantDebts[username].amountOwed += amountPerPerson;
+          }
+        });
+      }
+
+      const participantDetails = allUsernames.map(username => ({
+        username,
+        paid: participantDebts[username].paid,
+        proof: null,
+        amountOwed: participantDebts[username].amountOwed,
       }));
 
-      await SettlementRepository.create(currentMonth, payer, totalAmount, amountPerPerson, participants, roomId);
+      const totalParticipants = participantDetails.filter(p => p.amountOwed > 0).length;
+      const amountPerPerson = totalParticipants > 0 ? totalAmount / (totalParticipants + 1) : 0;
+
+      await SettlementRepository.create(
+        currentMonth,
+        payer,
+        totalAmount,
+        amountPerPerson,
+        participantDetails,
+        roomId
+      );
     }
 
     await PaymentRepository.deleteAllPayments(roomId);
